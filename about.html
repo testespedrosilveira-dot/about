@@ -12,7 +12,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #000000; /* fundo preto */
+      background: #000000;
       overflow: hidden;
       display: flex;
       justify-content: center;
@@ -78,7 +78,7 @@
       const trailColors = [
         [128, 128, 128],
         [0, 0, 0],
-        [Math.random()*255, Math.random()*255, Math.random()*255]
+        [Math.random() * 255, Math.random() * 255, Math.random() * 255]
       ];
 
       fileNames.forEach((url, idx) => {
@@ -160,9 +160,31 @@
           const isMain = d < mainRange;
           const isPartial = partialIndexes.includes(i);
 
+          /* 🔁 SHUFFLE */
+          if (isMain) {
+            t.shuffleTimer += p.deltaTime;
+            if (t.shuffleTimer >= t.shuffleInterval) {
+              t.shuffleTimer = 0;
+              t.shuffleInterval = p.random(80, 160);
+
+              let newIndex = Math.floor(p.random(imgs.length));
+              while (newIndex === t.imgIndex) {
+                newIndex = Math.floor(p.random(imgs.length));
+              }
+
+              t.imgIndex = newIndex;
+              t.imgColor = imgs[newIndex];
+              t.imgGray = imgsGray[newIndex];
+            }
+          }
+
           t.targetScale = isMain ? 1.75 : isPartial ? 1.1 : 1;
           t.targetAlpha = isMain ? 255 : isPartial ? 50 : 0;
-          t.targetRot = isMain ? p.random(-0.1, 0.1) : isPartial ? p.random(-0.05, 0.05) : 0;
+          t.targetRot = isMain
+            ? p.random(-0.1, 0.1)
+            : isPartial
+            ? p.random(-0.05, 0.05)
+            : 0;
 
           t.alpha = p.lerp(t.alpha, t.targetAlpha, p.deltaTime / (fadeDuration * 0.7));
           t.scale = p.lerp(t.scale, t.targetScale, 0.08);
