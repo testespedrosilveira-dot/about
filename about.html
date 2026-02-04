@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Video Grid Follow Cursor</title>
+  <title>Autoplay Video Grid Follow</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
@@ -30,7 +30,7 @@
 <script>
 new p5((p) => {
 
-  /* 🎥 CLOUDFARE VIDEOS */
+  /* 🎥 CLOUDFLARE STREAM */
   const videoIds = [
     "60c1d098633c336b9aa1bf156cffaff6",
     "b9cffa15ac0fe9a76e2105844206ae9e",
@@ -52,20 +52,24 @@ new p5((p) => {
   const rows = 4;
 
   let videos = [];
-  let started = false;
 
   let gridX = 0;
   let gridY = 0;
   let targetX = 0;
   let targetY = 0;
 
-  /* LOAD VIDEOS */
+  /* LOAD + AUTOPLAY */
   videoIds.slice(0, cols * rows).forEach(id => {
     const v = p.createVideo(`${baseUrl}/${id}/manifest/video.m3u8`);
+
     v.hide();
     v.volume(0);
+    v.elt.muted = true;   // 🔑 autoplay sem clique
+    v.elt.playsInline = true;
+
     v.loop();
-    v.pause();
+    v.play();
+
     videos.push(v);
   });
 
@@ -79,23 +83,14 @@ new p5((p) => {
     p.resizeCanvas(p.windowWidth, p.windowHeight);
   };
 
-  p.mousePressed = () => {
-    if (!started) {
-      videos.forEach(v => v.play());
-      started = true;
-    }
-  };
-
   p.draw = () => {
     p.background(0);
-
-    if (!started) return;
 
     targetX = p.mouseX;
     targetY = p.mouseY;
 
-    gridX = p.lerp(gridX, targetX, 0.08);
-    gridY = p.lerp(gridY, targetY, 0.08);
+    gridX = p.lerp(gridX, targetX, 0.06);
+    gridY = p.lerp(gridY, targetY, 0.06);
 
     const gridW = cols * tileSize;
     const gridH = rows * tileSize;
