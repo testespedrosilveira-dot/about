@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Floating Parallax Video Field</title>
+  <meta charset="UTF-8" />
+  <title>Floating Video Parallax</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
@@ -14,21 +15,37 @@
       background: #000;
       overflow: hidden;
     }
+
     #p5-holder {
-      width: 100%;
-      height: 100%;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
     }
+
     video {
-      display: none;
+      position: absolute;
+      object-fit: cover;
+      pointer-events: none;
+      will-change: transform;
     }
   </style>
 </head>
-
 <body>
+
 <div id="p5-holder"></div>
 
 <script>
 new p5((p) => {
+
+  /* ================= CONFIG ================= */
+
+  const VIDEO_COUNT = 40;
+  const BASE_SIZE = 150; // tamanho base dos retângulos
+  const FLOAT_SPREAD = 0.2; // controla o quão espalhado (menor = mais denso)
+  const PARALLAX_STRENGTH = 40;
+  const DRIFT = 0.15;
+
+  const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
   const videoIds = [
     "60c1d098633c336b9aa1bf156cffaff6",
@@ -44,97 +61,81 @@ new p5((p) => {
     "ece845ae8ca18aa6f2c6e442b5120c52"
   ];
 
-  const baseUrl =
-    "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+  /* =============== STATE ================== */
 
-  const VIDEO_COUNT = 40;
-  const BASE_SIZE = 150;
+  let videos = [];
 
-  let items = [];
-  let offsetX = 0;
-  let offsetY = 0;
-
-  for (let i = 0; i < VIDEO_COUNT; i++) {
-    const id = videoIds[i % videoIds.length];
-    const v = p.createVideo(
-      `${baseUrl}/${id}/manifest/video.m3u8`
-    );
-
-    v.hide();
-    v.volume(0);
-    v.elt.muted = true;
-    v.elt.playsInline = true;
-    v.loop();
-    v.play();
-
-    items.push({
-      video: v,
-
-      // 🔽 20% menos espaçamento
-      x: p.random(
-        -p.windowWidth * 0.48,
-         p.windowWidth * 1.32
-      ),
-      y: p.random(
-        -p.windowHeight * 0.48,
-         p.windowHeight * 1.32
-      ),
-
-      z: p.random(0.35, 1),
-      driftSeed: Math.random() * 1000
-    });
-  }
+  /* =============== SETUP ================== */
 
   p.setup = () => {
-    p.createCanvas(
-      p.windowWidth,
-      p.windowHeight
-    ).parent("p5-holder");
+    p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
+
+    for (let i = 0; i < VIDEO_COUNT; i++) {
+      const id = videoIds[i % videoIds.length];
+      const video = document.createElement("video");
+
+      video.src = `${STREAM_DOMAIN}/${id}/manifest/video.m3u8`;
+      video.muted = true;
+      video.loop = true;
+      video.autoplay = true;
+      video.playsInline = true;
+
+      const size = BASE_SIZE * p.random(0.8, 1.2);
+
+      document.body.appendChild(video);
+
+      videos.push({
+        el: video,
+        baseX: p.random(-p.width * FLOAT_SPREAD, p.width * (1 + FLOAT_SPREAD)),
+        baseY: p.random(-p.height * FLOAT_SPREAD, p.height * (1 + FLOAT_SPREAD)),
+        x: 0,
+        y: 0,
+        size,
+        depth: p.random(0.5, 1.2),
+        driftX: p.random(-DRIFT, DRIFT),
+        driftY: p.random(-DRIFT, DRIFT)
+      });
+    }
   };
 
-  p.windowResized = () => {
-    p.resizeCanvas(
-      p.windowWidth,
-      p.windowHeight
-    );
-  };
+  /* ================ DRAW ================== */
 
   p.draw = () => {
-    p.background(0);
+    p.clear();
 
-    const targetX =
-      (p.mouseX - p.width / 2) * 0.25;
-    const targetY =
-      (p.mouseY - p.height / 2) * 0.25;
+    const mx = (p.mouseX / p.width - 0.5) * PARALLAX_STRENGTH;
+    const my = (p.mouseY / p.height - 0.5) * PARALLAX_STRENGTH;
 
-    offsetX = p.lerp(offsetX, targetX, 0.04);
-    offsetY = p.lerp(offsetY, targetY, 0.04);
+    const cx = p.width / 2;
+    const cy = p.height / 2;
 
-    items.forEach(item => {
-      const t =
-        p.frameCount * 0.002 + item.driftSeed;
+    videos.forEach(v => {
 
-      const driftX = Math.sin(t) * 18;
-      const driftY = Math.cos(t * 1.3) * 18;
+      // drift contínuo
+      v.baseX += v.driftX;
+      v.baseY += v.driftY;
 
-      const px =
-        item.x + offsetX * item.z + driftX;
-      const py =
-        item.y + offsetY * item.z + driftY;
+      // leve atração ao centro (garante que tudo apareça)
+      v.baseX += (cx - v.baseX) * 0.0005;
+      v.baseY += (cy - v.baseY) * 0.0005;
 
-      const size = BASE_SIZE * item.z;
+      v.x = v.baseX + mx * v.depth;
+      v.y = v.baseY + my * v.depth;
 
-      p.image(
-        item.video,
-        px - size / 2,
-        py - size / 2,
-        size,
-        size
-      );
+      v.el.style.width = `${v.size}px`;
+      v.el.style.height = `${v.size}px`;
+      v.el.style.transform = `translate(${v.x}px, ${v.y}px)`;
     });
+  };
+
+  /* ============= RESIZE ================= */
+
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
   };
 
 });
 </script>
+
 </body>
 </html>
