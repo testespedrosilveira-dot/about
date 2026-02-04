@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Autoplay Video Grid Follow</title>
+  <title>Random Video Field Follow</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
@@ -47,36 +47,34 @@ new p5((p) => {
 
   const baseUrl = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-  const tileSize = 160;
-  const cols = 5;
-  const rows = 4;
+  const videoCount = 20;
+  const tileSize = 180;
 
-  let videos = [];
+  let items = [];
 
-  let gridX = 0;
-  let gridY = 0;
-  let targetX = 0;
-  let targetY = 0;
+  let offsetX = 0;
+  let offsetY = 0;
 
-  /* LOAD + AUTOPLAY */
-  videoIds.slice(0, cols * rows).forEach(id => {
+  /* LOAD VIDEOS */
+  videoIds.slice(0, videoCount).forEach(id => {
     const v = p.createVideo(`${baseUrl}/${id}/manifest/video.m3u8`);
 
     v.hide();
     v.volume(0);
-    v.elt.muted = true;   // 🔑 autoplay sem clique
+    v.elt.muted = true;
     v.elt.playsInline = true;
-
     v.loop();
     v.play();
 
-    videos.push(v);
+    items.push({
+      video: v,
+      x: Math.random(),
+      y: Math.random()
+    });
   });
 
   p.setup = () => {
     p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
-    gridX = p.width / 2;
-    gridY = p.height / 2;
   };
 
   p.windowResized = () => {
@@ -86,37 +84,25 @@ new p5((p) => {
   p.draw = () => {
     p.background(0);
 
-    targetX = p.mouseX;
-    targetY = p.mouseY;
+    // offset global suave
+    const targetX = (p.mouseX - p.width / 2) * 0.15;
+    const targetY = (p.mouseY - p.height / 2) * 0.15;
 
-    gridX = p.lerp(gridX, targetX, 0.06);
-    gridY = p.lerp(gridY, targetY, 0.06);
+    offsetX = p.lerp(offsetX, targetX, 0.05);
+    offsetY = p.lerp(offsetY, targetY, 0.05);
 
-    const gridW = cols * tileSize;
-    const gridH = rows * tileSize;
+    items.forEach(item => {
+      const px = item.x * p.width + offsetX;
+      const py = item.y * p.height + offsetY;
 
-    p.push();
-    p.translate(gridX - gridW / 2, gridY - gridH / 2);
-
-    let index = 0;
-    for (let y = 0; y < rows; y++) {
-      for (let x = 0; x < cols; x++) {
-        const v = videos[index];
-        if (!v) continue;
-
-        p.image(
-          v,
-          x * tileSize,
-          y * tileSize,
-          tileSize,
-          tileSize
-        );
-
-        index++;
-      }
-    }
-
-    p.pop();
+      p.image(
+        item.video,
+        px - tileSize / 2,
+        py - tileSize / 2,
+        tileSize,
+        tileSize
+      );
+    });
   };
 
 });
