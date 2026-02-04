@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>HomeFX Trail Effect – Video</title>
+  <title>Video Grid Follow Cursor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
@@ -30,7 +30,7 @@
 <script>
 new p5((p) => {
 
-  /* 🎥 CLOUDFARE VIDEOS (20 máx) */
+  /* 🎥 CLOUDFARE VIDEOS */
   const videoIds = [
     "60c1d098633c336b9aa1bf156cffaff6",
     "b9cffa15ac0fe9a76e2105844206ae9e",
@@ -47,16 +47,20 @@ new p5((p) => {
 
   const baseUrl = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-  const tileSize = 120;
-  const maxTiles = 40;
-  const mainRange = 220;
+  const tileSize = 160;
+  const cols = 5;
+  const rows = 4;
 
   let videos = [];
-  let tiles = [];
   let started = false;
 
-  /* 🎥 LOAD VIDEOS */
-  videoIds.forEach((id, i) => {
+  let gridX = 0;
+  let gridY = 0;
+  let targetX = 0;
+  let targetY = 0;
+
+  /* LOAD VIDEOS */
+  videoIds.slice(0, cols * rows).forEach(id => {
     const v = p.createVideo(`${baseUrl}/${id}/manifest/video.m3u8`);
     v.hide();
     v.volume(0);
@@ -65,27 +69,14 @@ new p5((p) => {
     videos.push(v);
   });
 
-  function generateTiles() {
-    tiles = [];
-    for (let i = 0; i < maxTiles; i++) {
-      tiles.push({
-        x: p.random(p.width),
-        y: p.random(p.height),
-        video: videos[i % videos.length],
-        alpha: 0,
-        scale: 1
-      });
-    }
-  }
-
   p.setup = () => {
     p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
-    generateTiles();
+    gridX = p.width / 2;
+    gridY = p.height / 2;
   };
 
   p.windowResized = () => {
     p.resizeCanvas(p.windowWidth, p.windowHeight);
-    generateTiles();
   };
 
   p.mousePressed = () => {
@@ -97,28 +88,40 @@ new p5((p) => {
 
   p.draw = () => {
     p.background(0);
+
     if (!started) return;
 
-    tiles.forEach(t => {
-      const d = p.dist(p.mouseX, p.mouseY, t.x, t.y);
-      const active = d < mainRange;
+    targetX = p.mouseX;
+    targetY = p.mouseY;
 
-      t.alpha = p.lerp(t.alpha, active ? 255 : 0, 0.08);
-      t.scale = p.lerp(t.scale, active ? 1.2 : 1, 0.08);
+    gridX = p.lerp(gridX, targetX, 0.08);
+    gridY = p.lerp(gridY, targetY, 0.08);
 
-      if (t.alpha > 5) {
-        p.push();
-        p.translate(t.x, t.y);
-        p.scale(t.scale);
-        p.imageMode(p.CENTER);
-        p.tint(255, t.alpha);
+    const gridW = cols * tileSize;
+    const gridH = rows * tileSize;
 
-        p.image(t.video, 0, 0, tileSize, tileSize);
+    p.push();
+    p.translate(gridX - gridW / 2, gridY - gridH / 2);
 
-        p.noTint();
-        p.pop();
+    let index = 0;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const v = videos[index];
+        if (!v) continue;
+
+        p.image(
+          v,
+          x * tileSize,
+          y * tileSize,
+          tileSize,
+          tileSize
+        );
+
+        index++;
       }
-    });
+    }
+
+    p.pop();
   };
 
 });
