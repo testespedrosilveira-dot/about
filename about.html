@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Floating Videos Cursor Reveal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Floating Video Parallax</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
     html, body {
@@ -11,160 +12,148 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #0a0a0a;
+      background: #000;
       overflow: hidden;
-      cursor: none;
-      font-family: sans-serif;
     }
 
-    #stage {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
+    #p5-holder {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
     }
 
-    .video-item {
+    video {
       position: absolute;
-      width: 180px;
-      aspect-ratio: 16 / 9;
-      overflow: hidden;
-      border-radius: 12px;
+      object-fit: cover;
       pointer-events: none;
-      will-change: transform, filter;
-      transition: filter 0.25s ease;
-      filter: grayscale(100%) contrast(1.1);
-    }
-
-    .video-item.active {
-      filter: grayscale(0%);
-    }
-
-    .video-item iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      pointer-events: none;
+      will-change: transform;
+      transform: translate3d(0,0,0);
+      transition: filter 0.6s ease;
     }
   </style>
 </head>
 <body>
 
-<div id="stage"></div>
+<div id="p5-holder"></div>
 
 <script>
-/* ==============================
-   CONFIG
-============================== */
+new p5((p) => {
 
-const VIDEO_IDS = [
-  "60c1d098633c336b9aa1bf156cffaff6",
-  "b9cffa15ac0fe9a76e2105844206ae9e",
-  "2dbd7a467c28852c4b0bda6f5548b338",
-  "444dfeadade4cc92bd67b33079ad20b1",
-  "6c933fc0db225e0aae9537c58c917025",
-  "7ba8c716b6997540ca3a1b045119d62a",
-  "e977b3c01aae4b32fa1f79b684f94f59",
-  "0d839285f84ca2735622faa2de9c8802",
-  "96573ba9ecc7bfff33caf52987b4b77e",
-  "95f8921709a349fb766be6a2d2f6a8fd",
-  "ece845ae8ca18aa6f2c6e442b5120c52"
-];
+  /* ================= CONFIG ================= */
 
-const SUBDOMAIN = "customer-pz1quf3nakoocijj.cloudflarestream.com";
+  const VIDEO_COUNT = 30;
+  const BASE_SIZE = 200;
+  const PARALLAX_STRENGTH = 55;
 
-const VIDEO_COUNT = 22;          // mais vídeos na tela
-const ACTIVATION_RADIUS = 140;   // área do cursor
-const PARALLAX_STRENGTH = 0.04;
+  const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-/* ==============================
-   SETUP
-============================== */
+  const videoIds = [
+    "60c1d098633c336b9aa1bf156cffaff6",
+    "b9cffa15ac0fe9a76e2105844206ae9e",
+    "2dbd7a467c28852c4b0bda6f5548b338",
+    "444dfeadade4cc92bd67b33079ad20b1",
+    "6c933fc0db225e0aae9537c58c917025",
+    "7ba8c716b6997540ca3a1b045119d62a",
+    "e977b3c01aae4b32fa1f79b684f94f59",
+    "0d839285f84ca2735622faa2de9c8802",
+    "96573ba9ecc7bfff33caf52987b4b77e",
+    "95f8921709a349fb766be6a2d2f6a8fd",
+    "ece845ae8ca18aa6f2c6e442b5120c52"
+  ];
 
-const stage = document.getElementById("stage");
-const items = [];
-let mouseX = window.innerWidth / 2;
-let mouseY = window.innerHeight / 2;
+  /* =============== STATE ================== */
 
-/* ==============================
-   CREATE VIDEOS
-============================== */
+  let videos = [];
+  let readyCount = 0;
+  let allReady = false;
 
-for (let i = 0; i < VIDEO_COUNT; i++) {
-  const id = VIDEO_IDS[i % VIDEO_IDS.length];
+  // mouse virtual (resolve travamento)
+  let mouseVX = 0;
+  let mouseVY = 0;
 
-  const div = document.createElement("div");
-  div.className = "video-item";
+  /* =============== SETUP ================== */
 
-  const iframe = document.createElement("iframe");
-  iframe.src = `https://${SUBDOMAIN}/${id}/iframe?autoplay=true&muted=true&loop=true&controls=false`;
+  p.setup = () => {
+    p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
 
-  div.appendChild(iframe);
-  stage.appendChild(div);
+    // inicia no centro
+    mouseVX = p.width / 2;
+    mouseVY = p.height / 2;
 
-  const obj = {
-    el: div,
-    x: Math.random() * window.innerWidth,
-    y: Math.random() * window.innerHeight,
-    baseX: 0,
-    baseY: 0
+    for (let i = 0; i < VIDEO_COUNT; i++) {
+      const id = videoIds[i % videoIds.length];
+      const video = document.createElement("video");
+
+      video.src = `${STREAM_DOMAIN}/${id}/manifest/video.m3u8`;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "auto";
+
+      // 🎨 variação P&B por elemento (leve!)
+      const brightness = p.random(0.6, 1.1);
+      const contrast = p.random(0.9, 1.4);
+      video.style.filter = `
+        grayscale(1)
+        brightness(${brightness})
+        contrast(${contrast})
+      `;
+
+      document.body.appendChild(video);
+
+      video.addEventListener("loadeddata", () => {
+        video.play().catch(() => {});
+        readyCount++;
+        if (readyCount === VIDEO_COUNT) {
+          allReady = true;
+        }
+      });
+
+      const size = BASE_SIZE * p.random(0.8, 1.25);
+
+      videos.push({
+        el: video,
+        baseX: p.random(0, p.width),
+        baseY: p.random(0, p.height),
+        size,
+        depth: p.random(0.4, 1.15)
+      });
+    }
   };
 
-  obj.baseX = obj.x;
-  obj.baseY = obj.y;
+  /* ================ DRAW ================== */
 
-  div.style.left = `${obj.x}px`;
-  div.style.top = `${obj.y}px`;
+  p.draw = () => {
+    if (!allReady) return;
 
-  items.push(obj);
-}
+    p.clear();
 
-/* ==============================
-   MOUSE
-============================== */
+    // suaviza mouse (remove lock)
+    mouseVX = p.lerp(mouseVX, p.mouseX || p.width / 2, 0.08);
+    mouseVY = p.lerp(mouseVY, p.mouseY || p.height / 2, 0.08);
 
-window.addEventListener("mousemove", e => {
-  mouseX = e.clientX;
-  mouseY = e.clientY;
-});
+    const nx = (mouseVX / p.width - 0.5) * 2;
+    const ny = (mouseVY / p.height - 0.5) * 2;
 
-/* ==============================
-   ANIMATION LOOP
-============================== */
+    const mx = nx * PARALLAX_STRENGTH;
+    const my = ny * PARALLAX_STRENGTH;
 
-function animate() {
-  items.forEach(item => {
-    const dx = mouseX - item.baseX;
-    const dy = mouseY - item.baseY;
-    const dist = Math.hypot(dx, dy);
+    videos.forEach(v => {
+      const x = v.baseX + mx * v.depth;
+      const y = v.baseY + my * v.depth;
 
-    // parallax suave
-    const px = item.baseX + dx * PARALLAX_STRENGTH;
-    const py = item.baseY + dy * PARALLAX_STRENGTH;
+      v.el.style.width = `${v.size}px`;
+      v.el.style.height = `${v.size}px`;
+      v.el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    });
+  };
 
-    item.el.style.transform = `translate(${px - item.baseX}px, ${py - item.baseY}px)`;
+  /* ============= RESIZE ================= */
 
-    // ativa cor só perto do cursor
-    if (dist < ACTIVATION_RADIUS) {
-      item.el.classList.add("active");
-    } else {
-      item.el.classList.remove("active");
-    }
-  });
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
+  };
 
-  requestAnimationFrame(animate);
-}
-
-animate();
-
-/* ==============================
-   RESIZE SAFE
-============================== */
-
-window.addEventListener("resize", () => {
-  items.forEach(item => {
-    item.baseX = Math.random() * window.innerWidth;
-    item.baseY = Math.random() * window.innerHeight;
-  });
 });
 </script>
 
