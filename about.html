@@ -40,9 +40,10 @@ new p5((p) => {
 
   /* ================= CONFIG ================= */
 
-  const VIDEO_COUNT = 22;
-  const BASE_SIZE = 150;
-  const PARALLAX_STRENGTH = 35;
+  const VIDEO_COUNT = 28;          // mais vídeos em tela
+  const BASE_SIZE = 190;           // maiores
+  const PARALLAX_STRENGTH = 45;    // pan mais perceptível
+  const DENSITY_PADDING = 60;      // menos espaço entre eles
 
   const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
@@ -63,16 +64,13 @@ new p5((p) => {
   /* =============== STATE ================== */
 
   let videos = [];
-  let mouseReady = false;
+  let readyCount = 0;
+  let allReady = false;
 
   /* =============== SETUP ================== */
 
   p.setup = () => {
     p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
-
-    // garante posição inicial correta
-    p.mouseX = p.width / 2;
-    p.mouseY = p.height / 2;
 
     for (let i = 0; i < VIDEO_COUNT; i++) {
       const id = videoIds[i % videoIds.length];
@@ -84,31 +82,32 @@ new p5((p) => {
       video.playsInline = true;
       video.preload = "auto";
 
-      video.style.width = `${BASE_SIZE}px`;
-      video.style.height = `${BASE_SIZE}px`;
-
       document.body.appendChild(video);
 
-      // força play de forma segura
-      video.play().catch(() => {});
+      video.addEventListener("loadeddata", () => {
+        video.play().catch(() => {});
+        readyCount++;
+        if (readyCount === VIDEO_COUNT) {
+          allReady = true;
+        }
+      });
+
+      const size = BASE_SIZE * p.random(0.85, 1.15);
 
       videos.push({
         el: video,
-        baseX: p.random(0, p.width),
-        baseY: p.random(0, p.height),
-        size: BASE_SIZE * p.random(0.75, 1.25),
+        baseX: p.random(DENSITY_PADDING, p.width - DENSITY_PADDING),
+        baseY: p.random(DENSITY_PADDING, p.height - DENSITY_PADDING),
+        size,
         depth: p.random(0.4, 1.1)
       });
     }
-
-    // ativa parallax só depois do primeiro frame
-    setTimeout(() => mouseReady = true, 50);
   };
 
   /* ================ DRAW ================== */
 
   p.draw = () => {
-    if (!mouseReady) return;
+    if (!allReady) return;
 
     p.clear();
 
