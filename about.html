@@ -1,37 +1,127 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>Cursor Video Trail</title>
-
+  <meta charset="UTF-8">
+  <title>HomeFX Trail Effect – Video</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      width: 100%;
+      height: 100%;
       background: #000;
+      overflow: hidden;
     }
-
-    #hint {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-family: sans-serif;
-      font-size: 14px;
-      pointer-events: none;
-      opacity: 0.7;
+    #p5-holder {
+      width: 100%;
+      height: 100%;
+    }
+    video {
+      display: none;
     }
   </style>
 </head>
 
 <body>
-  <div id="hint">clique para iniciar</div>
+<div id="p5-holder"></div>
 
-  <script src="sketch.js"></script>
+<script>
+new p5((p) => {
+
+  /* 🎥 CLOUDFARE VIDEOS (20 máx) */
+  const videoIds = [
+    "60c1d098633c336b9aa1bf156cffaff6",
+    "b9cffa15ac0fe9a76e2105844206ae9e",
+    "2dbd7a467c28852c4b0bda6f5548b338",
+    "444dfeadade4cc92bd67b33079ad20b1",
+    "6c933fc0db225e0aae9537c58c917025",
+    "7ba8c716b6997540ca3a1b045119d62a",
+    "e977b3c01aae4b32fa1f79b684f94f59",
+    "0d839285f84ca2735622faa2de9c8802",
+    "96573ba9ecc7bfff33caf52987b4b77e",
+    "95f8921709a349fb766be6a2d2f6a8fd",
+    "ece845ae8ca18aa6f2c6e442b5120c52"
+  ];
+
+  const baseUrl = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+
+  const tileSize = 120;
+  const maxTiles = 40;
+  const mainRange = 220;
+
+  let videos = [];
+  let tiles = [];
+  let started = false;
+
+  /* 🎥 LOAD VIDEOS */
+  videoIds.forEach((id, i) => {
+    const v = p.createVideo(`${baseUrl}/${id}/manifest/video.m3u8`);
+    v.hide();
+    v.volume(0);
+    v.loop();
+    v.pause();
+    videos.push(v);
+  });
+
+  function generateTiles() {
+    tiles = [];
+    for (let i = 0; i < maxTiles; i++) {
+      tiles.push({
+        x: p.random(p.width),
+        y: p.random(p.height),
+        video: videos[i % videos.length],
+        alpha: 0,
+        scale: 1
+      });
+    }
+  }
+
+  p.setup = () => {
+    p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
+    generateTiles();
+  };
+
+  p.windowResized = () => {
+    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    generateTiles();
+  };
+
+  p.mousePressed = () => {
+    if (!started) {
+      videos.forEach(v => v.play());
+      started = true;
+    }
+  };
+
+  p.draw = () => {
+    p.background(0);
+    if (!started) return;
+
+    tiles.forEach(t => {
+      const d = p.dist(p.mouseX, p.mouseY, t.x, t.y);
+      const active = d < mainRange;
+
+      t.alpha = p.lerp(t.alpha, active ? 255 : 0, 0.08);
+      t.scale = p.lerp(t.scale, active ? 1.2 : 1, 0.08);
+
+      if (t.alpha > 5) {
+        p.push();
+        p.translate(t.x, t.y);
+        p.scale(t.scale);
+        p.imageMode(p.CENTER);
+        p.tint(255, t.alpha);
+
+        p.image(t.video, 0, 0, tileSize, tileSize);
+
+        p.noTint();
+        p.pop();
+      }
+    });
+  };
+
+});
+</script>
 </body>
 </html>
