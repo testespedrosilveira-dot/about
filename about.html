@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>HomeFX Trail Effect</title>
+  <title>HomeFX Floating Grid</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
@@ -12,11 +12,8 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #000000;
+      background: #000;
       overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
     }
 
     #p5-holder {
@@ -37,7 +34,6 @@
         "https://ik.imagekit.io/q3d43lw6h/about/19.png",
         "https://ik.imagekit.io/q3d43lw6h/about/16.png",
         "https://ik.imagekit.io/q3d43lw6h/about/05.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/05.png",
         "https://ik.imagekit.io/q3d43lw6h/about/23.png",
         "https://ik.imagekit.io/q3d43lw6h/about/13.png",
         "https://ik.imagekit.io/q3d43lw6h/about/12.png",
@@ -51,7 +47,6 @@
         "https://ik.imagekit.io/q3d43lw6h/about/15.png",
         "https://ik.imagekit.io/q3d43lw6h/about/17.png",
         "https://ik.imagekit.io/q3d43lw6h/about/07.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/10.png",
         "https://ik.imagekit.io/q3d43lw6h/about/10.png",
         "https://ik.imagekit.io/q3d43lw6h/about/02.png",
         "https://ik.imagekit.io/q3d43lw6h/about/21.png",
@@ -77,8 +72,7 @@
 
       const trailColors = [
         [128, 128, 128],
-        [0, 0, 0],
-        [Math.random() * 255, Math.random() * 255, Math.random() * 255]
+        [0, 0, 0]
       ];
 
       fileNames.forEach((url, idx) => {
@@ -97,11 +91,8 @@
         const boxRatio = w / h;
         let drawW = w, drawH = h;
 
-        if (ratio > boxRatio) {
-          drawW = ratio * h;
-        } else {
-          drawH = w / ratio;
-        }
+        if (ratio > boxRatio) drawW = ratio * h;
+        else drawH = w / ratio;
 
         p.tint(255, alpha);
         p.image(img, -drawW / 2, -drawH / 2, drawW, drawH);
@@ -115,18 +106,18 @@
           tiles.push({
             x: p.random(tileSize / 2, p.width - tileSize / 2),
             y: p.random(tileSize / 2, p.height - tileSize / 2),
-            imgIndex,
             imgColor: imgs[imgIndex],
             imgGray: imgsGray[imgIndex],
-            rot: 0,
-            scale: 1,
             alpha: 0,
+            scale: 1,
+            rot: 0,
             targetAlpha: 0,
             targetScale: 1,
             targetRot: 0,
             trailColor: trailColors[Math.floor(p.random(trailColors.length))],
-            shuffleTimer: 0,
-            shuffleInterval: p.random(80, 160)
+            floatOffset: p.random(1000),
+            floatSpeed: p.random(0.001, 0.003),
+            baseRot: p.random(-0.05, 0.05)
           });
         }
       }
@@ -160,39 +151,20 @@
           const isMain = d < mainRange;
           const isPartial = partialIndexes.includes(i);
 
-          /* 🔁 SHUFFLE */
-          if (isMain) {
-            t.shuffleTimer += p.deltaTime;
-            if (t.shuffleTimer >= t.shuffleInterval) {
-              t.shuffleTimer = 0;
-              t.shuffleInterval = p.random(80, 160);
+          t.targetScale = isMain ? 1.6 : isPartial ? 1.15 : 1;
+          t.targetAlpha = isMain ? 255 : isPartial ? 60 : 0;
+          t.targetRot = t.baseRot + p.sin(p.frameCount * t.floatSpeed) * (isMain ? 0.08 : 0.03);
 
-              let newIndex = Math.floor(p.random(imgs.length));
-              while (newIndex === t.imgIndex) {
-                newIndex = Math.floor(p.random(imgs.length));
-              }
-
-              t.imgIndex = newIndex;
-              t.imgColor = imgs[newIndex];
-              t.imgGray = imgsGray[newIndex];
-            }
-          }
-
-          t.targetScale = isMain ? 1.75 : isPartial ? 1.1 : 1;
-          t.targetAlpha = isMain ? 255 : isPartial ? 50 : 0;
-          t.targetRot = isMain
-            ? p.random(-0.1, 0.1)
-            : isPartial
-            ? p.random(-0.05, 0.05)
-            : 0;
-
-          t.alpha = p.lerp(t.alpha, t.targetAlpha, p.deltaTime / (fadeDuration * 0.7));
+          t.alpha = p.lerp(t.alpha, t.targetAlpha, p.deltaTime / fadeDuration);
           t.scale = p.lerp(t.scale, t.targetScale, 0.08);
           t.rot = p.lerp(t.rot, t.targetRot, 0.08);
 
           if (t.alpha > 1) {
+            const floatX = p.cos(p.frameCount * t.floatSpeed + t.floatOffset) * 4;
+            const floatY = p.sin(p.frameCount * t.floatSpeed + t.floatOffset) * 6;
+
             p.push();
-            p.translate(t.x, t.y);
+            p.translate(t.x + floatX, t.y + floatY);
             p.rotate(t.rot);
             p.scale(t.scale);
             p.imageMode(p.CENTER);
@@ -201,7 +173,7 @@
 
             const c = t.trailColor;
             p.noStroke();
-            p.fill(c[0], c[1], c[2], t.alpha * 0.2);
+            p.fill(c[0], c[1], c[2], t.alpha * 0.18);
             p.rectMode(p.CENTER);
             p.rect(0, 0, tileSize, tileSize);
 
