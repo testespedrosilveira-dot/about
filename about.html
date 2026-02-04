@@ -30,7 +30,6 @@
 <script>
 new p5((p) => {
 
-  /* 🎥 CLOUDFLARE STREAM */
   const videoIds = [
     "60c1d098633c336b9aa1bf156cffaff6",
     "b9cffa15ac0fe9a76e2105844206ae9e",
@@ -45,7 +44,8 @@ new p5((p) => {
     "ece845ae8ca18aa6f2c6e442b5120c52"
   ];
 
-  const baseUrl = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+  const baseUrl =
+    "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
   const VIDEO_COUNT = 40;
   const BASE_SIZE = 150;
@@ -54,10 +54,11 @@ new p5((p) => {
   let offsetX = 0;
   let offsetY = 0;
 
-  /* LOAD VIDEOS (REUSO DE IDS) */
   for (let i = 0; i < VIDEO_COUNT; i++) {
     const id = videoIds[i % videoIds.length];
-    const v = p.createVideo(`${baseUrl}/${id}/manifest/video.m3u8`);
+    const v = p.createVideo(
+      `${baseUrl}/${id}/manifest/video.m3u8`
+    );
 
     v.hide();
     v.volume(0);
@@ -69,49 +70,57 @@ new p5((p) => {
     items.push({
       video: v,
 
-      // posições bem espalhadas
-      x: p.random(-p.windowWidth * 0.6, p.windowWidth * 1.6),
-      y: p.random(-p.windowHeight * 0.6, p.windowHeight * 1.6),
+      // 🔽 20% menos espaçamento
+      x: p.random(
+        -p.windowWidth * 0.48,
+         p.windowWidth * 1.32
+      ),
+      y: p.random(
+        -p.windowHeight * 0.48,
+         p.windowHeight * 1.32
+      ),
 
-      z: p.random(0.35, 1),       // profundidade
+      z: p.random(0.35, 1),
       driftSeed: Math.random() * 1000
     });
   }
 
   p.setup = () => {
-    p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
+    p.createCanvas(
+      p.windowWidth,
+      p.windowHeight
+    ).parent("p5-holder");
   };
 
   p.windowResized = () => {
-    p.resizeCanvas(p.windowWidth, p.windowHeight);
+    p.resizeCanvas(
+      p.windowWidth,
+      p.windowHeight
+    );
   };
 
   p.draw = () => {
     p.background(0);
 
-    // parallax global suave
-    const targetX = (p.mouseX - p.width / 2) * 0.25;
-    const targetY = (p.mouseY - p.height / 2) * 0.25;
+    const targetX =
+      (p.mouseX - p.width / 2) * 0.25;
+    const targetY =
+      (p.mouseY - p.height / 2) * 0.25;
 
     offsetX = p.lerp(offsetX, targetX, 0.04);
     offsetY = p.lerp(offsetY, targetY, 0.04);
 
     items.forEach(item => {
+      const t =
+        p.frameCount * 0.002 + item.driftSeed;
 
-      // float orgânico
-      const t = p.frameCount * 0.002 + item.driftSeed;
       const driftX = Math.sin(t) * 18;
       const driftY = Math.cos(t * 1.3) * 18;
 
       const px =
-        item.x +
-        offsetX * item.z +
-        driftX;
-
+        item.x + offsetX * item.z + driftX;
       const py =
-        item.y +
-        offsetY * item.z +
-        driftY;
+        item.y + offsetY * item.z + driftY;
 
       const size = BASE_SIZE * item.z;
 
