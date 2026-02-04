@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>HomeFX Floating Grid</title>
+  <title>Floating Video Grid</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
 
@@ -29,65 +29,39 @@
   <script>
     new p5((p) => {
 
-      const fileNames = [
-        "https://ik.imagekit.io/q3d43lw6h/about/26.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/19.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/16.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/05.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/23.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/13.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/12.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/14.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/25.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/28.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/27.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/20.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/18.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/22.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/15.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/17.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/07.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/10.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/02.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/21.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/09.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/11.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/08.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/04.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/06.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/03.png",
-        "https://ik.imagekit.io/q3d43lw6h/about/01.png"
+      /* ================= CONFIG ================= */
+
+      const STREAM_DOMAIN =
+        "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+
+      const videoIDs = [
+        "60c1d098633c336b9aa1bf156cffaff6",
+        "b9cffa15ac0fe9a76e2105844206ae9e",
+        "2dbd7a467c28852c4b0bda6f5548b338",
+        "444dfeadade4cc92bd67b33079ad20b1",
+        "6c933fc0db225e0aae9537c58c917025",
+        "7ba8c716b6997540ca3a1b045119d62a",
+        "e977b3c01aae4b32fa1f79b684f94f59",
+        "0d839285f84ca2735622faa2de9c8802",
+        "96573ba9ecc7bfff33caf52987b4b77e",
+        "95f8921709a349fb766be6a2d2f6a8fd",
+        "ece845ae8ca18aa6f2c6e442b5120c52"
       ];
 
-      const tileSize = 60;
-      const maxTiles = 333;
-      const mainRange = tileSize * 3 * 0.8;
-      const partialCount = 23;
+      const tileSize = 110;
+      const maxTiles = 40;
+      const mainRange = tileSize * 2.4;
       const fadeDuration = 500;
+      const MAX_ACTIVE_VIDEOS = 2;
 
-      let imgs = [];
-      let imgsGray = [];
+      /* ================= STATE ================= */
+
       let tiles = [];
-      let loadedCount = 0;
 
-      const trailColors = [
-        [128, 128, 128],
-        [0, 0, 0]
-      ];
+      /* ================= HELPERS ================= */
 
-      fileNames.forEach((url, idx) => {
-        p.loadImage(url, img => {
-          imgs[idx] = img;
-          let g = img.get();
-          g.filter(p.GRAY);
-          imgsGray[idx] = g;
-          loadedCount++;
-          if (loadedCount === fileNames.length) generateTiles();
-        });
-      });
-
-      function drawImageCover(img, w, h, alpha = 255) {
-        const ratio = img.width / img.height;
+      function drawMediaCover(media, w, h, alpha = 255) {
+        const ratio = media.width / media.height;
         const boxRatio = w / h;
         let drawW = w, drawH = h;
 
@@ -95,87 +69,107 @@
         else drawH = w / ratio;
 
         p.tint(255, alpha);
-        p.image(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        p.image(media, -drawW / 2, -drawH / 2, drawW, drawH);
         p.noTint();
       }
 
+      function activeVideoCount() {
+        return tiles.filter(t => t.active).length;
+      }
+
+      function activateVideo(t) {
+        if (t.active) return;
+        if (activeVideoCount() >= MAX_ACTIVE_VIDEOS) return;
+
+        t.video.play();
+        t.active = true;
+      }
+
+      function deactivateVideo(t) {
+        if (!t.active) return;
+
+        t.video.pause();
+        t.active = false;
+      }
+
+      /* ================= SETUP ================= */
+
       function generateTiles() {
         tiles = [];
+
         for (let i = 0; i < maxTiles; i++) {
-          const imgIndex = Math.floor(p.random(imgs.length));
+          const id = videoIDs[i % videoIDs.length];
+          const videoURL = `${STREAM_DOMAIN}/downloads/${id}.mp4`;
+
+          const video = p.createVideo(videoURL);
+          video.volume(0);
+          video.loop();
+          video.hide();
+          video.pause();
+          video.elt.setAttribute("playsinline", "");
+          video.elt.muted = true;
+
           tiles.push({
-            x: p.random(tileSize / 2, p.width - tileSize / 2),
-            y: p.random(tileSize / 2, p.height - tileSize / 2),
-            imgColor: imgs[imgIndex],
-            imgGray: imgsGray[imgIndex],
+            x: p.random(tileSize, p.width - tileSize),
+            y: p.random(tileSize, p.height - tileSize),
+            video,
             alpha: 0,
             scale: 1,
             rot: 0,
             targetAlpha: 0,
             targetScale: 1,
             targetRot: 0,
-            trailColor: trailColors[Math.floor(p.random(trailColors.length))],
+            active: false,
             floatOffset: p.random(1000),
-            floatSpeed: p.random(0.001, 0.003),
-            baseRot: p.random(-0.05, 0.05)
+            floatSpeed: p.random(0.0015, 0.003),
+            baseRot: p.random(-0.04, 0.04)
           });
         }
       }
 
       p.setup = () => {
         p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
+        generateTiles();
       };
 
       p.windowResized = () => {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
-        if (loadedCount === fileNames.length) generateTiles();
+        generateTiles();
       };
 
-      p.draw = () => {
-        if (loadedCount < fileNames.length) return;
+      /* ================= DRAW ================= */
 
+      p.draw = () => {
         p.background(0);
 
-        const distances = tiles.map((t, i) => ({
-          index: i,
-          dist: p.dist(p.mouseX, p.mouseY, t.x, t.y)
-        })).sort((a, b) => a.dist - b.dist);
-
-        const partialIndexes = distances
-          .filter(d => d.dist > mainRange)
-          .slice(0, partialCount)
-          .map(d => d.index);
-
-        tiles.forEach((t, i) => {
+        tiles.forEach(t => {
           const d = p.dist(p.mouseX, p.mouseY, t.x, t.y);
           const isMain = d < mainRange;
-          const isPartial = partialIndexes.includes(i);
 
-          t.targetScale = isMain ? 1.6 : isPartial ? 1.15 : 1;
-          t.targetAlpha = isMain ? 255 : isPartial ? 60 : 0;
-          t.targetRot = t.baseRot + p.sin(p.frameCount * t.floatSpeed) * (isMain ? 0.08 : 0.03);
+          if (isMain) activateVideo(t);
+          else deactivateVideo(t);
+
+          t.targetAlpha = isMain ? 255 : 80;
+          t.targetScale = isMain ? 1.3 : 1;
+          t.targetRot =
+            t.baseRot +
+            p.sin(p.frameCount * t.floatSpeed) * (isMain ? 0.08 : 0.03);
 
           t.alpha = p.lerp(t.alpha, t.targetAlpha, p.deltaTime / fadeDuration);
           t.scale = p.lerp(t.scale, t.targetScale, 0.08);
           t.rot = p.lerp(t.rot, t.targetRot, 0.08);
 
           if (t.alpha > 1) {
-            const floatX = p.cos(p.frameCount * t.floatSpeed + t.floatOffset) * 4;
-            const floatY = p.sin(p.frameCount * t.floatSpeed + t.floatOffset) * 6;
+            const fx = p.cos(p.frameCount * t.floatSpeed + t.floatOffset) * 6;
+            const fy = p.sin(p.frameCount * t.floatSpeed + t.floatOffset) * 8;
 
             p.push();
-            p.translate(t.x + floatX, t.y + floatY);
+            p.translate(t.x + fx, t.y + fy);
             p.rotate(t.rot);
             p.scale(t.scale);
             p.imageMode(p.CENTER);
 
-            drawImageCover(isMain ? t.imgColor : t.imgGray, tileSize, tileSize, t.alpha);
-
-            const c = t.trailColor;
-            p.noStroke();
-            p.fill(c[0], c[1], c[2], t.alpha * 0.18);
-            p.rectMode(p.CENTER);
-            p.rect(0, 0, tileSize, tileSize);
+            drawMediaCover(t.video, tileSize, tileSize, t.alpha);
 
             p.pop();
           }
