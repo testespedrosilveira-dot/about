@@ -40,10 +40,9 @@ new p5((p) => {
   /* ================= CONFIG ================= */
 
   const VIDEO_COUNT = 11;
-  const BASE_SIZE = 150; // tamanho base dos retângulos
-  const FLOAT_SPREAD = 0.16; // controla o quão espalhado (menor = mais denso)
-  const PARALLAX_STRENGTH = 40;
-  const DRIFT = 0.15;
+  const BASE_SIZE = 150;
+  const FLOAT_SPREAD = 0.16;
+  const PARALLAX_STRENGTH = 50;
 
   const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
@@ -80,7 +79,7 @@ new p5((p) => {
       video.autoplay = true;
       video.playsInline = true;
 
-      const size = BASE_SIZE * p.random(0.8, 1.2);
+      const size = BASE_SIZE * p.random(0.85, 1.15);
 
       document.body.appendChild(video);
 
@@ -88,12 +87,8 @@ new p5((p) => {
         el: video,
         baseX: p.random(-p.width * FLOAT_SPREAD, p.width * (1 + FLOAT_SPREAD)),
         baseY: p.random(-p.height * FLOAT_SPREAD, p.height * (1 + FLOAT_SPREAD)),
-        x: 0,
-        y: 0,
         size,
-        depth: p.random(0.5, 1.2),
-        driftX: p.random(-DRIFT, DRIFT),
-        driftY: p.random(-DRIFT, DRIFT)
+        depth: p.random(0.4, 1.1)
       });
     }
   };
@@ -106,29 +101,15 @@ new p5((p) => {
     const mx = (p.mouseX / p.width - 0.5) * PARALLAX_STRENGTH;
     const my = (p.mouseY / p.height - 0.5) * PARALLAX_STRENGTH;
 
-    const cx = p.width / 2;
-    const cy = p.height / 2;
-
     videos.forEach(v => {
-
-      // drift contínuo
-      v.baseX += v.driftX;
-      v.baseY += v.driftY;
-
-      // leve atração ao centro (garante que tudo apareça)
-      v.baseX += (cx - v.baseX) * 0.0005;
-      v.baseY += (cy - v.baseY) * 0.0005;
-
-      v.x = v.baseX + mx * v.depth;
-      v.y = v.baseY + my * v.depth;
+      const x = v.baseX + mx * v.depth;
+      const y = v.baseY + my * v.depth;
 
       v.el.style.width = `${v.size}px`;
       v.el.style.height = `${v.size}px`;
-      v.el.style.transform = `translate(${v.x}px, ${v.y}px)`;
+      v.el.style.transform = `translate(${x}px, ${y}px)`;
     });
   };
-
-  /* ============= RESIZE ================= */
 
   p.windowResized = () => {
     p.resizeCanvas(p.windowWidth, p.windowHeight);
