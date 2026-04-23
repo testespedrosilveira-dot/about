@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>3D Video Sphere</title>
+<title>3D Video Cube</title>
 
 <style>
   html, body {
@@ -33,9 +33,11 @@
 <script>
 /* ================= CONFIG ================= */
 
-const VIDEO_COUNT = 36; // ⚠️ mais estável que 60
-const RADIUS = 900;
-const BASE_SIZE = 180;
+const FACE_GRID = 4; // 4x4 por face
+const CUBE_SIZE = 900;
+const BASE_SIZE = 160;
+
+const VIDEO_COUNT = FACE_GRID * FACE_GRID * 6;
 
 const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
@@ -53,7 +55,7 @@ const videoIds = [
   "ece845ae8ca18aa6f2c6e442b5120c52"
 ];
 
-/* ================= THREE SETUP ================= */
+/* ================= THREE ================= */
 
 const scene = new THREE.Scene();
 
@@ -64,7 +66,7 @@ const camera = new THREE.PerspectiveCamera(
   5000
 );
 
-camera.position.z = 1200;
+camera.position.z = 1400;
 
 const renderer = new THREE.WebGLRenderer({ alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -80,14 +82,39 @@ let targetRotation = { x: 0, y: 0 };
 let isDragging = false;
 let prevMouse = { x: 0, y: 0 };
 
-/* ================= CREATE VIDEOS ================= */
+/* ================= CREATE CUBE ================= */
 
-for (let i = 0; i < VIDEO_COUNT; i++) {
-  const id = videoIds[i % videoIds.length];
+function createFace(axis, sign) {
+  const half = CUBE_SIZE / 2;
+  const spacing = CUBE_SIZE / FACE_GRID;
+
+  for (let i = 0; i < FACE_GRID; i++) {
+    for (let j = 0; j < FACE_GRID; j++) {
+
+      let x = (i - FACE_GRID/2 + 0.5) * spacing;
+      let y = (j - FACE_GRID/2 + 0.5) * spacing;
+      let z = 0;
+
+      // posiciona face
+      if (axis === "z") z = sign * half;
+      if (axis === "x") {
+        z = x;
+        x = sign * half;
+      }
+      if (axis === "y") {
+        z = y;
+        y = sign * half;
+      }
+
+      createVideo(x, y, z);
+    }
+  }
+}
+
+function createVideo(x, y, z) {
+  const id = videoIds[items.length % videoIds.length];
 
   const video = document.createElement("video");
-
-  // ✅ MP4 (funciona em todos browsers)
   video.src = `${STREAM_DOMAIN}/${id}/downloads/default.mp4`;
 
   video.muted = true;
@@ -96,27 +123,26 @@ for (let i = 0; i < VIDEO_COUNT; i++) {
   video.playsInline = true;
   video.autoplay = true;
 
-  // 🔒 garante autoplay
   video.addEventListener("canplay", () => {
     video.play().catch(() => {});
   });
 
   document.body.appendChild(video);
 
-  // distribuição Fibonacci (esfera uniforme)
-  const phi = Math.acos(-1 + (2 * i) / VIDEO_COUNT);
-  const theta = Math.sqrt(VIDEO_COUNT * Math.PI) * phi;
-
-  const x = RADIUS * Math.cos(theta) * Math.sin(phi);
-  const y = RADIUS * Math.sin(theta) * Math.sin(phi);
-  const z = RADIUS * Math.cos(phi);
-
   items.push({
     el: video,
     x, y, z,
-    size: BASE_SIZE * (0.8 + Math.random() * 0.4)
+    size: BASE_SIZE * (0.85 + Math.random() * 0.3)
   });
 }
+
+// 6 faces
+createFace("z", 1);
+createFace("z", -1);
+createFace("x", 1);
+createFace("x", -1);
+createFace("y", 1);
+createFace("y", -1);
 
 /* ================= INTERACTION ================= */
 
@@ -148,7 +174,6 @@ window.addEventListener("mousemove", (e) => {
 function animate() {
   requestAnimationFrame(animate);
 
-  // smooth motion
   rotation.x += (targetRotation.x - rotation.x) * 0.08;
   rotation.y += (targetRotation.y - rotation.y) * 0.08;
 
@@ -171,7 +196,7 @@ function animate() {
     dz = sinX * y + cosX * dz;
 
     // perspective
-    const scale = 1200 / (1200 + dz);
+    const scale = 1400 / (1400 + dz);
     const screenX = dx * scale + window.innerWidth / 2;
     const screenY = dy * scale + window.innerHeight / 2;
 
@@ -184,7 +209,7 @@ function animate() {
     el.style.transform = `translate(${screenX}px, ${screenY}px)`;
     el.style.zIndex = Math.floor(scale * 1000);
 
-    // hover no centro (pode mudar depois)
+    // hover centro
     const mx = window.innerWidth / 2;
     const my = window.innerHeight / 2;
 
