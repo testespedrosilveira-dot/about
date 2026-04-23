@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>3D Video Cube</title>
+<title>Cube Videos SAFE</title>
 
 <style>
   html, body {
@@ -18,7 +18,6 @@
     pointer-events: none;
     filter: grayscale(100%) brightness(0.8);
     transition: filter 0.25s ease;
-    will-change: transform;
   }
 
   video.active {
@@ -31,208 +30,150 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
 <script>
-/* ================= CONFIG ================= */
+window.addEventListener("load", () => {
 
-const FACE_GRID = 4; // 4x4 por face
-const CUBE_SIZE = 900;
-const BASE_SIZE = 160;
+  if (!window.THREE) {
+    document.body.innerHTML = "<h1 style='color:white'>Three.js não carregou</h1>";
+    return;
+  }
 
-const VIDEO_COUNT = FACE_GRID * FACE_GRID * 6;
+  const FACE_GRID = 3;
+  const CUBE_SIZE = 800;
+  const BASE_SIZE = 160;
 
-const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+  const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-const videoIds = [
-  "60c1d098633c336b9aa1bf156cffaff6",
-  "b9cffa15ac0fe9a76e2105844206ae9e",
-  "2dbd7a467c28852c4b0bda6f5548b338",
-  "444dfeadade4cc92bd67b33079ad20b1",
-  "6c933fc0db225e0aae9537c58c917025",
-  "7ba8c716b6997540ca3a1b045119d62a",
-  "e977b3c01aae4b32fa1f79b684f94f59",
-  "0d839285f84ca2735622faa2de9c8802",
-  "96573ba9ecc7bfff33caf52987b4b77e",
-  "95f8921709a349fb766be6a2d2f6a8fd",
-  "ece845ae8ca18aa6f2c6e442b5120c52"
-];
+  const videoIds = [
+    "60c1d098633c336b9aa1bf156cffaff6",
+    "b9cffa15ac0fe9a76e2105844206ae9e",
+    "2dbd7a467c28852c4b0bda6f5548b338"
+  ];
 
-/* ================= THREE ================= */
+  const scene = new THREE.Scene();
 
-const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    1,
+    5000
+  );
 
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth / window.innerHeight,
-  1,
-  5000
-);
+  camera.position.z = 1200;
 
-camera.position.z = 1400;
+  const renderer = new THREE.WebGLRenderer();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-const renderer = new THREE.WebGLRenderer({ alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+  let items = [];
 
-/* ================= STATE ================= */
+  function createVideo(x, y, z) {
+    const id = videoIds[items.length % videoIds.length];
 
-let items = [];
+    const v = document.createElement("video");
+    v.src = `${STREAM_DOMAIN}/${id}/downloads/default.mp4`;
 
-let rotation = { x: 0, y: 0 };
-let targetRotation = { x: 0, y: 0 };
+    v.muted = true;
+    v.setAttribute("muted", "");
+    v.autoplay = true;
+    v.loop = true;
+    v.playsInline = true;
 
-let isDragging = false;
-let prevMouse = { x: 0, y: 0 };
+    v.onloadeddata = () => {
+      v.play().catch(()=>{});
+    };
 
-/* ================= CREATE CUBE ================= */
+    document.body.appendChild(v);
 
-function createFace(axis, sign) {
-  const half = CUBE_SIZE / 2;
-  const spacing = CUBE_SIZE / FACE_GRID;
+    items.push({ el: v, x, y, z, size: BASE_SIZE });
+  }
 
-  for (let i = 0; i < FACE_GRID; i++) {
-    for (let j = 0; j < FACE_GRID; j++) {
+  function createCube() {
+    const half = CUBE_SIZE / 2;
+    const step = CUBE_SIZE / FACE_GRID;
 
-      let x = (i - FACE_GRID/2 + 0.5) * spacing;
-      let y = (j - FACE_GRID/2 + 0.5) * spacing;
-      let z = 0;
+    for (let i = 0; i < FACE_GRID; i++) {
+      for (let j = 0; j < FACE_GRID; j++) {
 
-      // posiciona face
-      if (axis === "z") z = sign * half;
-      if (axis === "x") {
-        z = x;
-        x = sign * half;
+        let px = (i - FACE_GRID/2 + 0.5) * step;
+        let py = (j - FACE_GRID/2 + 0.5) * step;
+
+        createVideo(px, py, half);
+        createVideo(px, py, -half);
+        createVideo(half, px, py);
+        createVideo(-half, px, py);
+        createVideo(px, half, py);
+        createVideo(px, -half, py);
       }
-      if (axis === "y") {
-        z = y;
-        y = sign * half;
-      }
-
-      createVideo(x, y, z);
     }
   }
-}
 
-function createVideo(x, y, z) {
-  const id = videoIds[items.length % videoIds.length];
+  createCube();
 
-  const video = document.createElement("video");
-  video.src = `${STREAM_DOMAIN}/${id}/downloads/default.mp4`;
+  let rotX = 0;
+  let rotY = 0;
 
-  video.muted = true;
-  video.setAttribute("muted", "");
-  video.loop = true;
-  video.playsInline = true;
-  video.autoplay = true;
+  let dragging = false;
+  let px = 0, py = 0;
 
-  video.addEventListener("canplay", () => {
-    video.play().catch(() => {});
-  });
+  window.onmousedown = (e) => {
+    dragging = true;
+    px = e.clientX;
+    py = e.clientY;
+  };
 
-  document.body.appendChild(video);
+  window.onmouseup = () => dragging = false;
 
-  items.push({
-    el: video,
-    x, y, z,
-    size: BASE_SIZE * (0.85 + Math.random() * 0.3)
-  });
-}
+  window.onmousemove = (e) => {
+    if (!dragging) return;
 
-// 6 faces
-createFace("z", 1);
-createFace("z", -1);
-createFace("x", 1);
-createFace("x", -1);
-createFace("y", 1);
-createFace("y", -1);
+    rotY += (e.clientX - px) * 0.005;
+    rotX += (e.clientY - py) * 0.005;
 
-/* ================= INTERACTION ================= */
+    px = e.clientX;
+    py = e.clientY;
+  };
 
-window.addEventListener("mousedown", (e) => {
-  isDragging = true;
-  prevMouse.x = e.clientX;
-  prevMouse.y = e.clientY;
-});
+  function loop() {
+    requestAnimationFrame(loop);
 
-window.addEventListener("mouseup", () => {
-  isDragging = false;
-});
+    items.forEach(o => {
+      let x = o.x, y = o.y, z = o.z;
 
-window.addEventListener("mousemove", (e) => {
-  if (!isDragging) return;
+      let cosY = Math.cos(rotY);
+      let sinY = Math.sin(rotY);
+      let dx = cosY * x - sinY * z;
+      let dz = sinY * x + cosY * z;
 
-  const dx = e.clientX - prevMouse.x;
-  const dy = e.clientY - prevMouse.y;
+      let cosX = Math.cos(rotX);
+      let sinX = Math.sin(rotX);
+      let dy = cosX * y - sinX * dz;
+      dz = sinX * y + cosX * dz;
 
-  targetRotation.y += dx * 0.005;
-  targetRotation.x += dy * 0.005;
+      let scale = 1200 / (1200 + dz);
 
-  prevMouse.x = e.clientX;
-  prevMouse.y = e.clientY;
-});
+      let sx = dx * scale + innerWidth/2;
+      let sy = dy * scale + innerHeight/2;
 
-/* ================= RENDER ================= */
+      let size = o.size * scale;
 
-function animate() {
-  requestAnimationFrame(animate);
+      const el = o.el;
 
-  rotation.x += (targetRotation.x - rotation.x) * 0.08;
-  rotation.y += (targetRotation.y - rotation.y) * 0.08;
+      el.style.width = size + "px";
+      el.style.height = size + "px";
+      el.style.transform = `translate(${sx}px, ${sy}px)`;
+      el.style.zIndex = (scale * 1000)|0;
 
-  items.forEach(item => {
+      // hover simples
+      let d = Math.hypot(sx - innerWidth/2, sy - innerHeight/2);
 
-    let x = item.x;
-    let y = item.y;
-    let z = item.z;
+      el.classList.toggle("active", d < size * 0.5);
+    });
 
-    // rotate Y
-    let cosY = Math.cos(rotation.y);
-    let sinY = Math.sin(rotation.y);
-    let dx = cosY * x - sinY * z;
-    let dz = sinY * x + cosY * z;
+    renderer.render(scene, camera);
+  }
 
-    // rotate X
-    let cosX = Math.cos(rotation.x);
-    let sinX = Math.sin(rotation.x);
-    let dy = cosX * y - sinX * dz;
-    dz = sinX * y + cosX * dz;
+  loop();
 
-    // perspective
-    const scale = 1400 / (1400 + dz);
-    const screenX = dx * scale + window.innerWidth / 2;
-    const screenY = dy * scale + window.innerHeight / 2;
-
-    const size = item.size * scale;
-
-    const el = item.el;
-
-    el.style.width = size + "px";
-    el.style.height = size + "px";
-    el.style.transform = `translate(${screenX}px, ${screenY}px)`;
-    el.style.zIndex = Math.floor(scale * 1000);
-
-    // hover centro
-    const mx = window.innerWidth / 2;
-    const my = window.innerHeight / 2;
-
-    const dist = Math.hypot(screenX - mx, screenY - my);
-
-    if (dist < size * 0.5) {
-      el.classList.add("active");
-    } else {
-      el.classList.remove("active");
-    }
-  });
-
-  renderer.render(scene, camera);
-}
-
-animate();
-
-/* ================= RESIZE ================= */
-
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
 
