@@ -1,141 +1,204 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <title>Floating Video Parallax</title>
+<meta charset="UTF-8">
+<title>3D Video Sphere</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
 
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-      cursor: default;
-    }
+  video {
+    position: absolute;
+    object-fit: cover;
+    pointer-events: none;
+    filter: grayscale(100%) brightness(0.8);
+    transition: filter 0.25s ease;
+    will-change: transform;
+  }
 
-    #p5-holder {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    video {
-      position: absolute;
-      object-fit: cover;
-      pointer-events: none;
-      filter: grayscale(100%) brightness(0.85);
-      transition: filter 0.25s ease;
-      will-change: transform;
-    }
-
-    video.active {
-      filter: grayscale(0%) brightness(1);
-    }
-  </style>
+  video.active {
+    filter: grayscale(0%) brightness(1);
+  }
+</style>
 </head>
 <body>
 
-<div id="p5-holder"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
 <script>
-new p5((p) => {
+/* ================= CONFIG ================= */
 
-  /* ============== CONFIG ================= */
+const VIDEO_COUNT = 60;
+const RADIUS = 900;
+const BASE_SIZE = 180;
 
-  const VIDEO_COUNT = 42;
-  const BASE_SIZE = 190;
-  const PARALLAX_STRENGTH = 55;
-  const SPREAD_X = 1.2;
-  const SPREAD_Y = 1.2;
+const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-  const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+const videoIds = [
+  "60c1d098633c336b9aa1bf156cffaff6",
+  "b9cffa15ac0fe9a76e2105844206ae9e",
+  "2dbd7a467c28852c4b0bda6f5548b338",
+  "444dfeadade4cc92bd67b33079ad20b1",
+  "6c933fc0db225e0aae9537c58c917025",
+  "7ba8c716b6997540ca3a1b045119d62a",
+  "e977b3c01aae4b32fa1f79b684f94f59",
+  "0d839285f84ca2735622faa2de9c8802",
+  "96573ba9ecc7bfff33caf52987b4b77e",
+  "95f8921709a349fb766be6a2d2f6a8fd",
+  "ece845ae8ca18aa6f2c6e442b5120c52"
+];
 
-  const videoIds = [
-    "60c1d098633c336b9aa1bf156cffaff6",
-    "b9cffa15ac0fe9a76e2105844206ae9e",
-    "2dbd7a467c28852c4b0bda6f5548b338",
-    "444dfeadade4cc92bd67b33079ad20b1",
-    "6c933fc0db225e0aae9537c58c917025",
-    "7ba8c716b6997540ca3a1b045119d62a",
-    "e977b3c01aae4b32fa1f79b684f94f59",
-    "0d839285f84ca2735622faa2de9c8802",
-    "96573ba9ecc7bfff33caf52987b4b77e",
-    "95f8921709a349fb766be6a2d2f6a8fd",
-    "ece845ae8ca18aa6f2c6e442b5120c52"
-  ];
+/* ================= THREE SETUP ================= */
 
-  /* ============== STATE ================= */
+const scene = new THREE.Scene();
 
-  let videos = [];
+const camera = new THREE.PerspectiveCamera(
+  60,
+  window.innerWidth / window.innerHeight,
+  1,
+  5000
+);
 
-  /* ============== SETUP ================= */
+camera.position.z = 1200;
 
-  p.setup = () => {
-    p.createCanvas(p.windowWidth, p.windowHeight).parent("p5-holder");
+const renderer = new THREE.WebGLRenderer({ alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-    for (let i = 0; i < VIDEO_COUNT; i++) {
-      const id = videoIds[i % videoIds.length];
-      const video = document.createElement("video");
+/* ================= STATE ================= */
 
-      video.src = `${STREAM_DOMAIN}/${id}/manifest/video.m3u8`;
-      video.muted = true;
-      video.loop = true;
-      video.autoplay = true;
-      video.playsInline = true;
+let items = [];
+let rotation = { x: 0, y: 0 };
+let targetRotation = { x: 0, y: 0 };
 
-      const size = BASE_SIZE * p.random(0.9, 1.15);
+let isDragging = false;
+let prevMouse = { x: 0, y: 0 };
 
-      document.body.appendChild(video);
+/* ================= CREATE VIDEOS ================= */
 
-      videos.push({
-        el: video,
-        baseX: p.random(-p.width * SPREAD_X, p.width * SPREAD_X),
-        baseY: p.random(-p.height * SPREAD_Y, p.height * SPREAD_Y),
-        size,
-        depth: p.random(0.4, 1.1)
-      });
+for (let i = 0; i < VIDEO_COUNT; i++) {
+  const id = videoIds[i % videoIds.length];
+
+  const video = document.createElement("video");
+  video.src = `${STREAM_DOMAIN}/${id}/manifest/video.m3u8`;
+  video.muted = true;
+  video.loop = true;
+  video.autoplay = true;
+  video.playsInline = true;
+
+  document.body.appendChild(video);
+
+  // distribuição uniforme na esfera (Fibonacci sphere 🔥)
+  const phi = Math.acos(-1 + (2 * i) / VIDEO_COUNT);
+  const theta = Math.sqrt(VIDEO_COUNT * Math.PI) * phi;
+
+  const x = RADIUS * Math.cos(theta) * Math.sin(phi);
+  const y = RADIUS * Math.sin(theta) * Math.sin(phi);
+  const z = RADIUS * Math.cos(phi);
+
+  items.push({
+    el: video,
+    x, y, z,
+    size: BASE_SIZE * (0.8 + Math.random() * 0.4)
+  });
+}
+
+/* ================= INTERACTION ================= */
+
+window.addEventListener("mousedown", (e) => {
+  isDragging = true;
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+
+window.addEventListener("mouseup", () => {
+  isDragging = false;
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!isDragging) return;
+
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+
+  targetRotation.y += dx * 0.005;
+  targetRotation.x += dy * 0.005;
+
+  prevMouse.x = e.clientX;
+  prevMouse.y = e.clientY;
+});
+
+/* ================= RENDER LOOP ================= */
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  // smooth rotation
+  rotation.x += (targetRotation.x - rotation.x) * 0.08;
+  rotation.y += (targetRotation.y - rotation.y) * 0.08;
+
+  items.forEach(item => {
+
+    // rotação manual (matriz simplificada)
+    let x = item.x;
+    let y = item.y;
+    let z = item.z;
+
+    // rotate Y
+    let cosY = Math.cos(rotation.y);
+    let sinY = Math.sin(rotation.y);
+    let dx = cosY * x - sinY * z;
+    let dz = sinY * x + cosY * z;
+
+    // rotate X
+    let cosX = Math.cos(rotation.x);
+    let sinX = Math.sin(rotation.x);
+    let dy = cosX * y - sinX * dz;
+    dz = sinX * y + cosX * dz;
+
+    // perspective
+    const scale = 1200 / (1200 + dz);
+    const screenX = dx * scale + window.innerWidth / 2;
+    const screenY = dy * scale + window.innerHeight / 2;
+
+    const size = item.size * scale;
+
+    const el = item.el;
+
+    el.style.width = size + "px";
+    el.style.height = size + "px";
+    el.style.transform = `translate(${screenX}px, ${screenY}px)`;
+    el.style.zIndex = Math.floor(scale * 1000);
+
+    // hover
+    const mx = window.innerWidth / 2;
+    const my = window.innerHeight / 2;
+
+    const dist = Math.hypot(screenX - mx, screenY - my);
+
+    if (dist < size * 0.5) {
+      el.classList.add("active");
+    } else {
+      el.classList.remove("active");
     }
-  };
+  });
 
-  /* ============== DRAW ================= */
+  renderer.render(scene, camera);
+}
 
-  p.draw = () => {
-    p.clear();
+animate();
 
-    const mx = (p.mouseX / p.width - 0.5) * PARALLAX_STRENGTH;
-    const my = (p.mouseY / p.height - 0.5) * PARALLAX_STRENGTH;
+/* ================= RESIZE ================= */
 
-    videos.forEach(v => {
-      const x = v.baseX + mx * v.depth;
-      const y = v.baseY + my * v.depth;
-
-      v.el.style.width = `${v.size}px`;
-      v.el.style.height = `${v.size}px`;
-      v.el.style.transform = `translate(${x}px, ${y}px)`;
-
-      // hover detection (leve e barato)
-      const dx = p.mouseX - (x + v.size / 2);
-      const dy = p.mouseY - (y + v.size / 2);
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist < v.size * 0.55) {
-        v.el.classList.add("active");
-      } else {
-        v.el.classList.remove("active");
-      }
-    });
-  };
-
-  /* ============== RESIZE ================= */
-
-  p.windowResized = () => {
-    p.resizeCanvas(p.windowWidth, p.windowHeight);
-  };
-
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 </script>
 
