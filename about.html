@@ -33,7 +33,7 @@
 <script>
 /* ================= CONFIG ================= */
 
-const VIDEO_COUNT = 60;
+const VIDEO_COUNT = 36; // ⚠️ mais estável que 60
 const RADIUS = 900;
 const BASE_SIZE = 180;
 
@@ -73,6 +73,7 @@ document.body.appendChild(renderer.domElement);
 /* ================= STATE ================= */
 
 let items = [];
+
 let rotation = { x: 0, y: 0 };
 let targetRotation = { x: 0, y: 0 };
 
@@ -85,15 +86,24 @@ for (let i = 0; i < VIDEO_COUNT; i++) {
   const id = videoIds[i % videoIds.length];
 
   const video = document.createElement("video");
-  video.src = `${STREAM_DOMAIN}/${id}/manifest/video.m3u8`;
+
+  // ✅ MP4 (funciona em todos browsers)
+  video.src = `${STREAM_DOMAIN}/${id}/downloads/default.mp4`;
+
   video.muted = true;
+  video.setAttribute("muted", "");
   video.loop = true;
-  video.autoplay = true;
   video.playsInline = true;
+  video.autoplay = true;
+
+  // 🔒 garante autoplay
+  video.addEventListener("canplay", () => {
+    video.play().catch(() => {});
+  });
 
   document.body.appendChild(video);
 
-  // distribuição uniforme na esfera (Fibonacci sphere 🔥)
+  // distribuição Fibonacci (esfera uniforme)
   const phi = Math.acos(-1 + (2 * i) / VIDEO_COUNT);
   const theta = Math.sqrt(VIDEO_COUNT * Math.PI) * phi;
 
@@ -133,18 +143,17 @@ window.addEventListener("mousemove", (e) => {
   prevMouse.y = e.clientY;
 });
 
-/* ================= RENDER LOOP ================= */
+/* ================= RENDER ================= */
 
 function animate() {
   requestAnimationFrame(animate);
 
-  // smooth rotation
+  // smooth motion
   rotation.x += (targetRotation.x - rotation.x) * 0.08;
   rotation.y += (targetRotation.y - rotation.y) * 0.08;
 
   items.forEach(item => {
 
-    // rotação manual (matriz simplificada)
     let x = item.x;
     let y = item.y;
     let z = item.z;
@@ -175,7 +184,7 @@ function animate() {
     el.style.transform = `translate(${screenX}px, ${screenY}px)`;
     el.style.zIndex = Math.floor(scale * 1000);
 
-    // hover
+    // hover no centro (pode mudar depois)
     const mx = window.innerWidth / 2;
     const my = window.innerHeight / 2;
 
