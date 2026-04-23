@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Cube Videos SAFE</title>
+<title>Organic Video Cube</title>
 
 <style>
   html, body {
@@ -18,6 +18,7 @@
     pointer-events: none;
     filter: grayscale(100%) brightness(0.8);
     transition: filter 0.25s ease;
+    will-change: transform;
   }
 
   video.active {
@@ -27,47 +28,108 @@
 </head>
 <body>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
 <script>
-window.addEventListener("load", () => {
+/* ================= CONFIG ================= */
 
-  if (!window.THREE) {
-    document.body.innerHTML = "<h1 style='color:white'>Three.js não carregou</h1>";
-    return;
-  }
+const VIDEO_COUNT = 42;
+const RADIUS = 900;
+const BASE_SIZE = 170;
 
-  const FACE_GRID = 3;
-  const CUBE_SIZE = 800;
-  const BASE_SIZE = 160;
+const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
 
-  const STREAM_DOMAIN = "https://customer-pz1quf3nakoocijj.cloudflarestream.com";
+const videoIds = [
+  "60c1d098633c336b9aa1bf156cffaff6",
+  "b9cffa15ac0fe9a76e2105844206ae9e",
+  "2dbd7a467c28852c4b0bda6f5548b338",
+  "444dfeadade4cc92bd67b33079ad20b1",
+  "6c933fc0db225e0aae9537c58c917025",
+  "7ba8c716b6997540ca3a1b045119d62a",
+  "e977b3c01aae4b32fa1f79b684f94f59",
+  "0d839285f84ca2735622faa2de9c8802",
+  "96573ba9ecc7bfff33caf52987b4b77e",
+  "95f8921709a349fb766be6a2d2f6a8fd",
+  "ece845ae8ca18aa6f2c6e442b5120c52"
+];
 
-  const videoIds = [
-    "60c1d098633c336b9aa1bf156cffaff6",
-    "b9cffa15ac0fe9a76e2105844206ae9e",
-    "2dbd7a467c28852c4b0bda6f5548b338"
-  ];
+/* ================= MATH ================= */
 
-  const scene = new THREE.Scene();
+function point3(x, y, z) {
+  return { x, y, z };
+}
 
-  const camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    1,
-    5000
+function rotateX(p, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return point3(p.x, p.y * c - p.z * s, p.y * s + p.z * c);
+}
+
+function rotateY(p, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return point3(p.x * c + p.z * s, p.y, -p.x * s + p.z * c);
+}
+
+/* ================= DISTRIBUTION ================= */
+
+// Fibonacci sphere
+function fibonacciSphere(i, total) {
+  const phi = Math.acos(-1 + (2 * i) / total);
+  const theta = Math.sqrt(total * Math.PI) * phi;
+
+  return point3(
+    Math.cos(theta) * Math.sin(phi),
+    Math.sin(theta) * Math.sin(phi),
+    Math.cos(phi)
   );
+}
 
-  camera.position.z = 1200;
+// sphere → cube (🔥 chave do visual)
+function sphereToCube(p) {
+  const ax = Math.abs(p.x);
+  const ay = Math.abs(p.y);
+  const az = Math.abs(p.z);
 
-  const renderer = new THREE.WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
+  const max = Math.max(ax, ay, az);
 
-  let items = [];
+  return point3(
+    p.x / max,
+    p.y / max,
+    p.z / max
+  );
+}
 
-  function createVideo(x, y, z) {
-    const id = videoIds[items.length % videoIds.length];
+/* ================= STATE ================= */
+
+let items = [];
+let rotX = 0;
+let rotY = 0;
+
+let targetX = 0;
+let targetY = 0;
+
+let dragging = false;
+let px = 0, py = 0;
+
+/* ================= CREATE ================= */
+
+function create() {
+  for (let i = 0; i < VIDEO_COUNT; i++) {
+
+    let p = fibonacciSphere(i, VIDEO_COUNT);
+    p = sphereToCube(p);
+
+    // leve flatten (estética)
+    p.y *= 0.8;
+
+    // escala
+    p.x *= RADIUS;
+    p.y *= RADIUS;
+    p.z *= RADIUS;
+
+    // ruído leve (orgânico)
+    p.x += (Math.random() - 0.5) * 40;
+    p.y += (Math.random() - 0.5) * 40;
+    p.z += (Math.random() - 0.5) * 40;
+
+    const id = videoIds[i % videoIds.length];
 
     const v = document.createElement("video");
     v.src = `${STREAM_DOMAIN}/${id}/downloads/default.mp4`;
@@ -84,97 +146,77 @@ window.addEventListener("load", () => {
 
     document.body.appendChild(v);
 
-    items.push({ el: v, x, y, z, size: BASE_SIZE });
-  }
-
-  function createCube() {
-    const half = CUBE_SIZE / 2;
-    const step = CUBE_SIZE / FACE_GRID;
-
-    for (let i = 0; i < FACE_GRID; i++) {
-      for (let j = 0; j < FACE_GRID; j++) {
-
-        let px = (i - FACE_GRID/2 + 0.5) * step;
-        let py = (j - FACE_GRID/2 + 0.5) * step;
-
-        createVideo(px, py, half);
-        createVideo(px, py, -half);
-        createVideo(half, px, py);
-        createVideo(-half, px, py);
-        createVideo(px, half, py);
-        createVideo(px, -half, py);
-      }
-    }
-  }
-
-  createCube();
-
-  let rotX = 0;
-  let rotY = 0;
-
-  let dragging = false;
-  let px = 0, py = 0;
-
-  window.onmousedown = (e) => {
-    dragging = true;
-    px = e.clientX;
-    py = e.clientY;
-  };
-
-  window.onmouseup = () => dragging = false;
-
-  window.onmousemove = (e) => {
-    if (!dragging) return;
-
-    rotY += (e.clientX - px) * 0.005;
-    rotX += (e.clientY - py) * 0.005;
-
-    px = e.clientX;
-    py = e.clientY;
-  };
-
-  function loop() {
-    requestAnimationFrame(loop);
-
-    items.forEach(o => {
-      let x = o.x, y = o.y, z = o.z;
-
-      let cosY = Math.cos(rotY);
-      let sinY = Math.sin(rotY);
-      let dx = cosY * x - sinY * z;
-      let dz = sinY * x + cosY * z;
-
-      let cosX = Math.cos(rotX);
-      let sinX = Math.sin(rotX);
-      let dy = cosX * y - sinX * dz;
-      dz = sinX * y + cosX * dz;
-
-      let scale = 1200 / (1200 + dz);
-
-      let sx = dx * scale + innerWidth/2;
-      let sy = dy * scale + innerHeight/2;
-
-      let size = o.size * scale;
-
-      const el = o.el;
-
-      el.style.width = size + "px";
-      el.style.height = size + "px";
-      el.style.transform = `translate(${sx}px, ${sy}px)`;
-      el.style.zIndex = (scale * 1000)|0;
-
-      // hover simples
-      let d = Math.hypot(sx - innerWidth/2, sy - innerHeight/2);
-
-      el.classList.toggle("active", d < size * 0.5);
+    items.push({
+      el: v,
+      x: p.x,
+      y: p.y,
+      z: p.z,
+      size: BASE_SIZE * (0.85 + Math.random() * 0.3)
     });
-
-    renderer.render(scene, camera);
   }
+}
 
+/* ================= INTERACTION ================= */
+
+window.onmousedown = (e) => {
+  dragging = true;
+  px = e.clientX;
+  py = e.clientY;
+};
+
+window.onmouseup = () => dragging = false;
+
+window.onmousemove = (e) => {
+  if (!dragging) return;
+
+  targetY += (e.clientX - px) * 0.005;
+  targetX += (e.clientY - py) * 0.005;
+
+  px = e.clientX;
+  py = e.clientY;
+};
+
+/* ================= LOOP ================= */
+
+function loop() {
+  requestAnimationFrame(loop);
+
+  rotX += (targetX - rotX) * 0.08;
+  rotY += (targetY - rotY) * 0.08;
+
+  items.forEach(o => {
+
+    let p = point3(o.x, o.y, o.z);
+
+    p = rotateY(p, rotY);
+    p = rotateX(p, rotX);
+
+    const scale = 1200 / (1200 + p.z);
+
+    const sx = p.x * scale + innerWidth / 2;
+    const sy = p.y * scale + innerHeight / 2;
+
+    const size = o.size * scale;
+
+    const el = o.el;
+
+    el.style.width = size + "px";
+    el.style.height = size + "px";
+    el.style.transform = `translate(${sx}px, ${sy}px)`;
+    el.style.zIndex = (scale * 1000) | 0;
+
+    // hover central (simples e leve)
+    const d = Math.hypot(sx - innerWidth/2, sy - innerHeight/2);
+    el.classList.toggle("active", d < size * 0.5);
+  });
+}
+
+/* ================= INIT ================= */
+
+window.onload = () => {
+  create();
   loop();
-
-});
+};
 </script>
 
 </body>
